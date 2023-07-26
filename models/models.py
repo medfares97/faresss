@@ -141,56 +141,55 @@ class EbMergeTasks(models.Model):
         for current in self:
             res_cpt = []
             # Vérification si un projet est sélectionné
-            if not current.project_id:
-                raise exceptions.UserError(_("Vous devez sélectionner un projet!"))
-            # Vérification du type d'opération
-            if current.type == '1':
-                # Vérification si des étapes/kits concernés sont sélectionnés
-                if not current.task_ids:
-                    raise exceptions.UserError(_("Vous devez sélectionner les étapes/kits concernées!"))
-                # Vérification si des Zones et Secteurs sont mentionnés
-                if not current.line_ids:
-                    raise exceptions.UserError(_("Vous devez mentionner les Zones et Secteurs!"))
+            if current.project_id:
+                if current.type == '1':
+                    # Vérification si des étapes/kits concernés sont sélectionnés
+                    if not current.task_ids:
+                        raise exceptions.UserError(_("Vous devez sélectionner les étapes/kits concernées!"))
+                    # Vérification si des Zones et Secteurs sont mentionnés
+                    if not current.line_ids:
+                        raise exceptions.UserError(_("Vous devez mentionner les Zones et Secteurs!"))
 
-                l = []
-                v = []
-                # Itération sur les étapes/kits sélectionnés
-                for tt in current.task_ids:
-                    this_p = tt
-                    # Séparation des étapes avec et sans kit
-                    if this_p.kit_id:
-                        v.append(this_p.kit_id.id)
+                    l = []
+                    v = []
+                    
+                    # Itération sur les étapes/kits sélectionnés
+                    for tt in current.task_ids:
+                        this_p = tt
+                        # Séparation des étapes avec et sans kit
+                        if this_p.kit_id:
+                            v.append(this_p.kit_id.id)
+                        else:
+                            l.append(this_p.name)
+                        # Recherche des tâches en fonction des critères
+                    if len(v) > 0:
+                        tasks = self.env['project.task.work'].search([
+                            ('project_id', '=', current.project_id.id),
+                            ('state', 'in', ('draft', 'affect')),
+                            ('kit_id', 'in', v),
+                            ('active', '=', True),
+                            ('is_copy', '=', False),
+                        ])
                     else:
-                        l.append(this_p.name)
-                    # Recherche des tâches en fonction des critères
-                if len(v) > 0:
-                    tasks = self.env['project.task.work'].search([
-                        ('project_id', '=', current.project_id.id),
-                        ('state', 'in', ('draft', 'affect')),
-                        ('kit_id', 'in', v),
-                        ('active', '=', True),
-                        ('is_copy', '=', False),
-                    ])
-                else:
-                    tasks = self.env['project.task.work'].search([
-                        ('project_id', '=', current.project_id.id),
-                        ('state', 'in', ('draft', 'affect')),
-                        ('etape', 'in', l),
-                    ])
-                    # Vérification des tâches et des relations avant de poursuivre
-                if len(l) > 0:
-                    ll1 = self.env['base.task.merge.automatic.wizard.project.task.work.rel'].search([
-                        ('base_task_merge_automatic_wizard_id', '=', current.id),
-                    ])
-                    if not ll1:
-                        raise exceptions.UserError(_("Merci de sauvegarder le document avant!"))
+                        tasks = self.env['project.task.work'].search([
+                            ('project_id', '=', current.project_id.id),
+                            ('state', 'in', ('draft', 'affect')),
+                            ('etape', 'in', l),
+                        ])
+                        # Vérification des tâches et des relations avant de poursuivre
+                    if len(l) > 0:
+                        ll1 = self.env['base.task.merge.automatic.wizard.project.task.work.rel'].search([
+                            ('base_task_merge_automatic_wizard_id', '=', current.id),
+                        ])
+                        if not ll1:
+                            raise exceptions.UserError(_("Merci de sauvegarder le document avant!"))
+                        else:
+                            # Collecte des ID des tâches dans la relation
+                            res_cpt = [nn.project_task_work_id.id for nn in ll1]
+                            # Intersection entre les tâches trouvées et celles de la relation
+                        pp = set(tasks.ids).intersection(res_cpt)
                     else:
-                        # Collecte des ID des tâches dans la relation
-                        res_cpt = [nn.project_task_work_id.id for nn in ll1]
-                        # Intersection entre les tâches trouvées et celles de la relation
-                    pp = set(tasks.ids).intersection(res_cpt)
-                else:
-                    res_cpt = tasks.ids
+                        res_cpt = tasks.ids
 
             elif current.type == '2':
                 l = []
